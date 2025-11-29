@@ -1,9 +1,11 @@
 const express = require("express");
 const app = express();
+require("dotenv").config()
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGO_URL = process.env.MONGO_URL;
 const mongoose = require("mongoose");
-mongoose.connect("mongodb+srv://shashwatniranjan1_db_user:QcvIkzKSBWuUPbVS@cluster0.6afomns.mongodb.net/todo-shashwat");
+mongoose.connect(MONGO_URL);
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = "randomString";
 const {UserModel, TodoModel} = require("../database/db");
 app.use(express.json());
 const {z} = require("zod");
@@ -82,7 +84,14 @@ app.post("/signin", async function(req, res) {
 })
 
 app.post("/todo", auth, async function(req, res) {
-    
+    const userId = req.userId;
+    const title = req.body.title;
+    const done = req.body.done;
+    await TodoModel.create({
+        title : title,
+        done : done,
+        userId : userId
+    })
 })
 
 app.listen(3000, () => {

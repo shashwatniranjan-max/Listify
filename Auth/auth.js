@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { UserModel } = require("../database/db");
-const JWT_SECRET = "randomString"
-
+require("dotenv").config();
+JWT_SECRET = process.env.JWT_SECRET;
 async function auth(req, res, next) {
     try {
         const token = req.headers.token;
