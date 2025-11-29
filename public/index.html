@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Me</title>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>My list</h2>
+            <button onclick="logout()">Log out</button>
+        </div>
+        <ul class="todo-list" id="todo-list">
+            <!--tasks will be injected here by js-->
+        </ul>
+        <button class="fab-btn" onclick="openModal()">+</button>
+    </div>
+    <dialog id="todo-Modal">
+        <div class="modal-content">
+            <h3>Add new task</h3>
+            <input type="text" name="" id="todo-input" placeholder="write task">
+            <div class="modal-actions">
+                <button onclick="closeModal()">Cancel</button>
+                <button onclick="addTodo()">Add</button>
+            </div>
+        </div>
+    </dialog>
+</body>
+</html>
