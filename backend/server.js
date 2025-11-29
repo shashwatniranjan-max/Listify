@@ -10,12 +10,23 @@ const {UserModel, TodoModel} = require("../database/db");
 app.use(express.json());
 const {z} = require("zod");
 const bcrypt = require("bcrypt")
-const auth = require("./../Auth/auth");
+const auth = require("../authMiddleware/auth");
+const path = require("path");
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+app.get("/me", function(req, res) {
+    res.sendFile(path.join(__dirname, "..", "public/index.html"));
+})
+
+app.get("/authentication", function(req, res) {
+    res.sendFile(path.join(__dirname, "..", "/public/auth.html"))
+})
 
 app.post("/signup", async function(req, res) {
     const requiredBody = z.object({
         email : z.email().min(5).max(100),
-        password : z.string().min(5).max(100)
+        password : z.string().min(5).max(100),
+        name : z.string().min(5).max(25)
     })
     try {
         const parsedDataWithSuccess = requiredBody.safeParse(req.body, {strict : true});
@@ -24,7 +35,7 @@ app.post("/signup", async function(req, res) {
             res.json({msg : "incorrect format", error : parsedDataWithSuccess.error.message});
             return;
         }else {
-            const {email, password} = parsedDataWithSuccess.data;
+            const {email, password, name} = parsedDataWithSuccess.data;
             const foundUser = await UserModel.findOne({
                 email
             })
@@ -32,7 +43,8 @@ app.post("/signup", async function(req, res) {
             const hashedPassword = await bcrypt.hash(password, 10); //manages salting itself
             await UserModel.create({
                 email : email,
-                password : hashedPassword
+                password : hashedPassword,
+                name : name
             })
             res.json({msg : "Signed up"})
         }
@@ -64,10 +76,11 @@ app.post("/signin", async function(req, res) {
            const isCorrect = await bcrypt.compare(password, response.password);
            if(isCorrect) {
             const token = jwt.sign({
-                userId : response._id
+                userId : response._id, name : response.name
             }, JWT_SECRET)
             res.json({
                 msg : "signed in",
+                name : response.name,
                 token : token
             })
            } else {
