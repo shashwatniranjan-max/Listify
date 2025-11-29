@@ -1,12 +1,11 @@
 const jwt = require("jsonwebtoken");
 const { UserModel } = require("../database/db");
 require("dotenv").config();
-JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET;
 async function auth(req, res, next) {
     try {
         const token = req.headers.token;
         if(!token) return res.json({msg : "token null , sign in again"});
-        const JWT_SECRET = require("./../backend/server");
         const decodetoken = jwt.verify(token, JWT_SECRET);
         const foundUser = await UserModel.findOne({
             _id : decodetoken.userId
@@ -17,9 +16,18 @@ async function auth(req, res, next) {
         req.userId = foundUser._id;
         next();
     }catch(e) {
-        res.status(400).json({
-            msg : "error occurred",
-            error : e
+        if(e.name === "JsonWebTokenError"){
+            return res.status(403).json({
+                msg : "Invalid Token"
+            })
+        }else if(e.name === "TokenExpiredError"){
+            return res.status(403).json({
+                msg : "Token expired"
+            })
+        }
+        console.log("Auth middleware error", e);
+        res.status(500).json({
+            msg : "Internal server error"
         })
     }
 }

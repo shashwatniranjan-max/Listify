@@ -92,6 +92,60 @@ app.post("/todo", auth, async function(req, res) {
         done : done,
         userId : userId
     })
+    res.json({
+        msg : "todo created",
+        title
+    })
+})
+
+app.get("/todos", auth, async function(req, res) {
+    const userId = req.userId;
+    const todos = await TodoModel.find({
+        userId : userId
+    }).select("title done _id");
+    if(!todos) return res.json({msg : "todo list is empty"});
+    res.json({
+        todos
+    })
+})
+
+app.put("/me/:id", auth, async function(req, res) {
+    const userId = req.userId;
+    const todoId = req.params.id;
+    const updatedData = {};
+    const {title, done} = req.body;
+    try {
+        if(title !== undefined) updatedData.title = title;
+        if(done !== undefined) updatedData.done = done;
+        const updatedTodo = await TodoModel.findOneAndUpdate({
+            _id : todoId,
+            userId : userId
+        }, updatedData, {new : true}).select("title done _id");
+        if(!updatedData) {
+            return res.status(403).json({
+                msg : "Todo not found or you are not authorized to edit it"
+            })
+        }
+        res.json({
+            msg : "todo has been updated",
+            updatedTodo
+        })
+    }catch(e) {
+        res.status(400).json({msg : "Error occurred", error : e.message})  
+    }
+})
+
+app.delete("/delete/:id", auth, async function(req, res) {
+    const userId = req.userId;
+    const todoId = req.params.id;
+    const deletedTodo = await TodoModel.findOneAndDelete({
+        _id : todoId,
+        userId : userId
+    }).select("title done _id");
+    res.json({
+        msg : "todo deleted",
+        deletedTodo
+    })
 })
 
 app.listen(3000, () => {
