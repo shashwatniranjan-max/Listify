@@ -1,34 +1,29 @@
-const jwt = require("jsonwebtoken");
-const { UserModel } = require("../database/db");
-require("dotenv").config();
-const JWT_SECRET = process.env.JWT_SECRET;
+const {UserModel} = require("../db/db");
+
 async function auth(req, res, next) {
     try {
         const token = req.headers.token;
-        if(!token) return res.json({msg : "token null , sign in again"});
-        const decodetoken = jwt.verify(token, JWT_SECRET);
+        const decodeToken = jwt.verify(token, process.env.JWT_SECRET);
+        if(!decodeToken) return res.status(403).json({msg : "invalid token"});
         const foundUser = await UserModel.findOne({
-            _id : decodetoken.userId
+            _id : decodeToken.userId
         })
         if(!foundUser) {
-            return res.json({msg : "token invalid, sign in again"});
+            return res.status(403).json({msg : "token invalid, sign in again"});
         }
         req.userId = foundUser._id;
         next();
     }catch(e) {
-        if(e.name === "JsonWebTokenError"){
-            return res.status(403).json({
-                msg : "Invalid Token"
-            })
-        }else if(e.name === "TokenExpiredError"){
-            return res.status(403).json({
-                msg : "Token expired"
-            })
+        if(e.name === "JsonWebTokenError") {
+            return res.status(403).json({msg : "Invalid Token"})
+        }else if(e.name === "TokenExpiredError") {
+            return res.status(403).json({msg : "Token Expired"});
         }
-        console.log("Auth middleware error", e);
-        res.status(500).json({
+        console.log("Auth Middleware Error", e);
+        return res.status(500).json({
             msg : "Internal server error"
         })
     }
 }
+
 module.exports = auth;
