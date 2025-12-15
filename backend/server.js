@@ -10,7 +10,7 @@ const {UserModel, TodoModel} = require("../database/db");
 app.use(express.json());
 const {z} = require("zod");
 const bcrypt = require("bcrypt")
-const auth = require("../authMiddleware/auth");
+const auth = require("../Middleware/auth");
 const path = require("path");
 app.use(express.static(path.join(__dirname, "..", "public")));
 
