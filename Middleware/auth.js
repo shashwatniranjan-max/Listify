@@ -1,5 +1,5 @@
-const {UserModel} = require("../db/db");
-
+const {UserModel} = require("../database/db");
+const jwt = require("jsonwebtoken");
 async function auth(req, res, next) {
     try {
         const token = req.headers.token;

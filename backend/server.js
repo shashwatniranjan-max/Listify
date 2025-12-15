@@ -1,8 +1,9 @@
 const express = require("express");
+const path = require("path");
 const app = express();
 app.use(express.json());
 require("dotenv").config();
-const {UserModel, TodoModel} = require("../db/db")
+const {UserModel, TodoModel} = require("../database/db")
 const MONGO_URL = process.env.MONGO_URL;
 const mongoose = require("mongoose");
 mongoose.connect(MONGO_URL)
@@ -17,40 +18,50 @@ const validate = require("../Middleware/validation")
 const {signupSchema, signinSchema} = require("../validators/auth.validator");
 const {createTodoSchema, updateTodoSchema}  = require("../validators/todo.validator")
 const errorHandler = require("../Middleware/errorHandler");
-app.use(errorHandler)
+// Serve frontend HTML
+app.use("/", express.static(path.join(__dirname, "..", "public")));
+
+app.use("/assets", express.static(path.join(__dirname, "..", "assets")));
+
+app.get("/me", function(req, res) {
+    res.sendFile(path.join(__dirname, "..", "/public/index.html"));
+})
+
+app.get("/auth", function(req, res) {
+    res.sendFile(path.join(__dirname, "..", "public/auth.html"))
+})
 
 app.post("/signup", validate(signupSchema), async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
+    
     await UserModel.create({
-      name,
-      email,
-      password: hashedPassword
+        name,
+        email,
+        password: hashedPassword
     });
-
+    
     res.json({ msg: "Signed up" });
-
+    
   } catch (err) {
-    next(err); 
-  }
+      next(err); 
+    }
 });
 
-
 app.post("/signin", validate(signinSchema), async (req, res, next) => {
-  try {
+    try {
     const { email, password } = req.body;
-
+    
     const user = await UserModel.findOne({ email });
     if (!user) {
-      return res.status(404).json({ msg: "User not found" });
+        return res.status(404).json({ msg: "User not found" });
     }
-
+    
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
-      return res.status(403).json({ msg: "Invalid credentials" });
+        return res.status(403).json({ msg: "Invalid credentials" });
     }
 
     const token = jwt.sign(
@@ -58,31 +69,30 @@ app.post("/signin", validate(signinSchema), async (req, res, next) => {
       JWT_SECRET,
       { expiresIn: "7d" }
     );
-
+    
     res.json({ token });
-
-  } catch (err) {
+    
+} catch (err) {
     next(err);
   }
 });
 
 app.post("/todo", auth, validate(createTodoSchema), async (req, res, next) => {
-  try {
-    const { title, done } = req.body;
-
-    await TodoModel.create({
-      title,
-      done,
+    try {
+        const { title, done } = req.body;
+        
+        await TodoModel.create({
+            title,
+            done,
       userId: req.userId
     });
 
     res.json({ msg: "Todo created" });
 
-  } catch (err) {
+} catch (err) {
     next(err);
-  }
+}
 });
-
 
 app.get("/todos", auth, async function(req, res) {
     const userId = req.userId;
@@ -97,13 +107,13 @@ app.get("/todos", auth, async function(req, res) {
 })
 
 app.put("/me/:id", auth, validate(updateTodoSchema), async (req, res, next) => {
-  try {
-    if (Object.keys(req.body).length === 0) {
-      return res.status(400).json({ msg: "Nothing to update" });
-    }
-
-    const todo = await TodoModel.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
+    try {
+        if (Object.keys(req.body).length === 0) {
+            return res.status(400).json({ msg: "Nothing to update" });
+        }
+        
+        const todo = await TodoModel.findOneAndUpdate(
+            { _id: req.params.id, userId: req.userId },
       req.body,
       { new: true }
     );
@@ -111,10 +121,10 @@ app.put("/me/:id", auth, validate(updateTodoSchema), async (req, res, next) => {
     if (!todo) {
       return res.status(404).json({ msg: "Todo not found" });
     }
-
+    
     res.json({ msg: "Updated", todo });
-
-  } catch (err) {
+    
+} catch (err) {
     next(err);
   }
 });
@@ -130,6 +140,7 @@ app.delete("/delete/:id", auth, async function(req, res) {
     res.json({msg : "deleted the todo successfully", deletedTodo});
 })
 
+app.use(errorHandler)
 app.listen(3000, () => {
     console.log("server running on port 3000");
 })
