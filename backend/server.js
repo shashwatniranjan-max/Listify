@@ -1,166 +1,135 @@
 const express = require("express");
 const app = express();
-require("dotenv").config()
-const JWT_SECRET = process.env.JWT_SECRET;
+app.use(express.json());
+require("dotenv").config();
+const {UserModel, TodoModel} = require("../db/db")
 const MONGO_URL = process.env.MONGO_URL;
 const mongoose = require("mongoose");
-mongoose.connect(MONGO_URL);
+mongoose.connect(MONGO_URL)
+    .then(() => console.log("DB connected"))
+    .catch(err => console.log(err))
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const jwt = require("jsonwebtoken");
-const {UserModel, TodoModel} = require("../database/db");
-app.use(express.json());
-const {z} = require("zod");
+const auth = require("../Middleware/auth")
 const bcrypt = require("bcrypt")
-const auth = require("../Middleware/auth");
-const path = require("path");
-app.use(express.static(path.join(__dirname, "..", "public")));
+const validate = require("../Middleware/validation")
+const {signupSchema, signinSchema} = require("../validators/auth.validator");
+const {createTodoSchema, updateTodoSchema}  = require("../validators/todo.validator")
+const errorHandler = require("../Middleware/errorHandler");
+app.use(errorHandler)
 
-app.get("/me", function(req, res) {
-    res.sendFile(path.join(__dirname, "..", "public/index.html"));
-})
+app.post("/signup", validate(signupSchema), async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
 
-app.get("/authentication", function(req, res) {
-    res.sendFile(path.join(__dirname, "..", "/public/auth.html"))
-})
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-app.post("/signup", async function(req, res) {
-    const requiredBody = z.object({
-        email : z.email().min(5).max(100),
-        password : z.string().min(5).max(100),
-        name : z.string().min(5).max(25)
-    })
-    try {
-        const parsedDataWithSuccess = requiredBody.safeParse(req.body, {strict : true});
-        if(!parsedDataWithSuccess.success) {
-            console.log(parsedDataWithSuccess.error.message)
-            res.json({msg : "incorrect format", error : parsedDataWithSuccess.error.message});
-            return;
-        }else {
-            const {email, password, name} = parsedDataWithSuccess.data;
-            const foundUser = await UserModel.findOne({
-                email
-            })
-            if(foundUser) return res.json({msg : "user already exist"});
-            const hashedPassword = await bcrypt.hash(password, 10); //manages salting itself
-            await UserModel.create({
-                email : email,
-                password : hashedPassword,
-                name : name
-            })
-            res.json({msg : "Signed up"})
-        }
-    }catch(e) {
-        console.log(e);
-        res.json({
-            msg : "Incorrect format",
-            error : e.message
-        })
+    await UserModel.create({
+      name,
+      email,
+      password: hashedPassword
+    });
+
+    res.json({ msg: "Signed up" });
+
+  } catch (err) {
+    next(err); 
+  }
+});
+
+
+app.post("/signin", validate(signinSchema), async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
     }
-})
 
-app.post("/signin", async function(req, res) {
-    const requiredBody = z.object({
-        email : z.email().min(5).max(100),
-        password : z.string().min(5).max(100)
-    })
-    try {
-        const parsedDataWithSuccess = requiredBody.safeParse(req.body, {strict : true});
-        if(!parsedDataWithSuccess.success) {
-            res.json({msg : "incorrect format", error : parsedDataWithSuccess.error});
-            return;
-        }else {
-        const {email , password} = parsedDataWithSuccess.data;
-           const response = await UserModel.findOne({
-            email : email
-           })
-           if(!response) return res.status(400).json({msg : "User doesn't exist"});
-           const isCorrect = await bcrypt.compare(password, response.password);
-           if(isCorrect) {
-            const token = jwt.sign({
-                userId : response._id, name : response.name
-            }, JWT_SECRET)
-            res.json({
-                msg : "signed in",
-                name : response.name,
-                token : token
-            })
-           } else {
-            res.status(400).json({msg : "invalid credentials"});
-            return
-           }
-        }
-    } catch(e) {
-        res.json({
-            msg : "Error occurred",
-            error : e
-        })
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) {
+      return res.status(403).json({ msg: "Invalid credentials" });
     }
-})
 
-app.post("/todo", auth, async function(req, res) {
-    const userId = req.userId;
-    const title = req.body.title;
-    const done = req.body.done;
+    const token = jwt.sign(
+      { userId: user._id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/todo", auth, validate(createTodoSchema), async (req, res, next) => {
+  try {
+    const { title, done } = req.body;
+
     await TodoModel.create({
-        title : title,
-        done : done,
-        userId : userId
-    })
-    res.json({
-        msg : "todo created",
-        title
-    })
-})
+      title,
+      done,
+      userId: req.userId
+    });
+
+    res.json({ msg: "Todo created" });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 app.get("/todos", auth, async function(req, res) {
     const userId = req.userId;
     const todos = await TodoModel.find({
-        userId : userId
+        userId
     }).select("title done _id");
-    if(!todos) return res.json({msg : "todo list is empty"});
+    if(todos.length === 0) return res.json({msg : "todo list is empty", todos : []});
     res.json({
+        msg : "todos fetched",
         todos
     })
 })
 
-app.put("/me/:id", auth, async function(req, res) {
-    const userId = req.userId;
-    const todoId = req.params.id;
-    const updatedData = {};
-    const {title, done} = req.body;
-    try {
-        if(title !== undefined) updatedData.title = title;
-        if(done !== undefined) updatedData.done = done;
-        const updatedTodo = await TodoModel.findOneAndUpdate({
-            _id : todoId,
-            userId : userId
-        }, updatedData, {new : true}).select("title done _id");
-        if(!updatedData) {
-            return res.status(403).json({
-                msg : "Todo not found or you are not authorized to edit it"
-            })
-        }
-        res.json({
-            msg : "todo has been updated",
-            updatedTodo
-        })
-    }catch(e) {
-        res.status(400).json({msg : "Error occurred", error : e.message})  
+app.put("/me/:id", auth, validate(updateTodoSchema), async (req, res, next) => {
+  try {
+    if (Object.keys(req.body).length === 0) {
+      return res.status(400).json({ msg: "Nothing to update" });
     }
-})
+
+    const todo = await TodoModel.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      req.body,
+      { new: true }
+    );
+
+    if (!todo) {
+      return res.status(404).json({ msg: "Todo not found" });
+    }
+
+    res.json({ msg: "Updated", todo });
+
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.delete("/delete/:id", auth, async function(req, res) {
     const userId = req.userId;
     const todoId = req.params.id;
     const deletedTodo = await TodoModel.findOneAndDelete({
-        _id : todoId,
-        userId : userId
+        userId : userId,
+        _id : todoId
     }).select("title done _id");
-    res.json({
-        msg : "todo deleted",
-        deletedTodo
-    })
+    if(!deletedTodo) return res.status(404).json({ msg: "Todo not found or you are not authorized to delete it" });
+    res.json({msg : "deleted the todo successfully", deletedTodo});
 })
 
 app.listen(3000, () => {
-    console.log("server running on port 3000")
+    console.log("server running on port 3000");
 })
