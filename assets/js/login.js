@@ -44,7 +44,7 @@ async function signIn() {
         const data = response.data;
         const token = response.data.token;
         localStorage.setItem("token", token);
-        alert(data.msg);
+        alert("sign in successfully");
         window.location.href = "/me";
     }catch(err) {
         if(err.response) {

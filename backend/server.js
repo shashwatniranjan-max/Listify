@@ -51,7 +51,7 @@ app.post("/signup", validate(signupSchema), async (req, res, next) => {
 });
 
 app.post("/signin", validate(signinSchema), async (req, res, next) => {
-    try {
+    try { 
     const { email, password } = req.body;
     
     const user = await UserModel.findOne({ email });
