@@ -35,6 +35,19 @@ app.post("/signup", validate(signupSchema), async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
+    // Check if user already exists
+    const existingUser = await UserModel.findOne({ 
+      $or: [{ email }, { name }] 
+    });
+    
+    if (existingUser) {
+      return res.status(409).json({ 
+        msg: existingUser.email === email 
+          ? "Email already registered" 
+          : "Username already taken" 
+      });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     
     await UserModel.create({
