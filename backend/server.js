@@ -18,6 +18,11 @@ const validate = require("../Middleware/validation")
 const {signupSchema, signinSchema} = require("../validators/auth.validator");
 const {createTodoSchema, updateTodoSchema}  = require("../validators/todo.validator")
 const errorHandler = require("../Middleware/errorHandler");
+const { apiLimiter, authLimiter, todoCreationLimiter } = require("../Middleware/rateLimiter");
+
+// Apply general rate limiting to all routes
+app.use(apiLimiter);
+
 // Serve frontend HTML
 app.use("/", express.static(path.join(__dirname, "..", "public")));
 
@@ -31,7 +36,7 @@ app.get("/auth", function(req, res) {
     res.sendFile(path.join(__dirname, "..", "public/auth.html"))
 })
 
-app.post("/signup", validate(signupSchema), async (req, res, next) => {
+app.post("/signup", authLimiter, validate(signupSchema), async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -63,7 +68,7 @@ app.post("/signup", validate(signupSchema), async (req, res, next) => {
     }
 });
 
-app.post("/signin", validate(signinSchema), async (req, res, next) => {
+app.post("/signin", authLimiter, validate(signinSchema), async (req, res, next) => {
     try { 
     const { email, password } = req.body;
     
@@ -90,7 +95,7 @@ app.post("/signin", validate(signinSchema), async (req, res, next) => {
   }
 });
 
-app.post("/todo", auth, validate(createTodoSchema), async (req, res, next) => {
+app.post("/todo", todoCreationLimiter, auth, validate(createTodoSchema), async (req, res, next) => {
     try {
         const { title, done } = req.body;
         
@@ -134,7 +139,6 @@ app.put("/me/:id", auth, validate(updateTodoSchema), async (req, res, next) => {
     if (!todo) {
       return res.status(404).json({ msg: "Todo not found" });
     }
-    
     res.json({ msg: "Updated", todo });
     
 } catch (err) {
