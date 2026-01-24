@@ -23,6 +23,15 @@ const { apiLimiter, authLimiter, todoCreationLimiter } = require("../Middleware/
 // Apply general rate limiting to all routes
 app.use(apiLimiter);
 
+// Health check endpoint for monitoring
+app.get("/health", (req, res) => {
+    res.status(200).json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 // Serve frontend HTML
 app.use("/", express.static(path.join(__dirname, "..", "public")));
 
